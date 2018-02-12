@@ -6,8 +6,8 @@ const int KEYROWCOUNT=5;
 const int KEYCOLCOUNT=10;
 char KEYBOARD[KEYROWCOUNT][KEYCOLCOUNT]= {{'1','2','3','4','5','6','7','8','9','0'},{'Q','W','E','R','T','Z','U','I','O','P'},
 {'A','S','D','F','G','H','J','K','L',(char)13},
-{'Y','X','C','V','B','N','M',(char)8},
-{'<','>',(char)12,';',':',',','-',(char)32}};
+{'Y','X','C','V','B','N','M','(',')',(char)8},
+{'<','>',(char)12,';',':',',','-',(char)32,'@','?'}};
 
 int closeButtonSize=30;
 
@@ -69,7 +69,10 @@ String Peep::handleTouch(int x,int y){
 					shift=!shift;
 					refreshKeyboard();
 				}else
-				
+				if((int)KEYBOARD[row][col]==13){
+					hideKeyboard();
+					return -1;
+				}else
 				{
 					if(shift){
 						keyboardText=keyboardText+String(KEYBOARD[row][col]);
@@ -133,6 +136,7 @@ int keyCount=sizeof(KEYBOARD[0])/sizeof(KEYBOARD[0][0]);
 				getDisplay()->println("SPC");
 			}
 			else
+			
 			if((int)KEYBOARD[k][i]==12){
 				getDisplay()->println("SHFT");
 			}
