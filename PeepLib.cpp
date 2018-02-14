@@ -12,9 +12,16 @@ char KEYBOARD[KEYROWCOUNT][KEYCOLCOUNT]= {{'1','2','3','4','5','6','7','8','9','
 int closeButtonSize=30;
 
 
+void Paintable::setZIndex(int zIndex){
+	this->zIndex=zIndex;
+}
+
+int Paintable::getZIndex(){
+	return zIndex;
+}
+
 Peep::Peep(MCUFRIEND_kbv *tft):Paintable(){
-	//tft=new MCUFRIEND_kbv();
-	//Serial.println(&tft);
+	setZIndex(0);
 	this->tft=tft;
 	tft->fillScreen(BACKGROUND); 
  	elementCount=-1;
@@ -22,6 +29,8 @@ Peep::Peep(MCUFRIEND_kbv *tft):Paintable(){
 	keyboardVisible=false;
  
 }
+
+
 
 void Peep::repaint(){
 	tft->fillScreen(BACKGROUND); 
@@ -71,7 +80,7 @@ String Peep::handleTouch(int x,int y){
 				}else
 				if((int)KEYBOARD[row][col]==13){
 					hideKeyboard();
-					return -1;
+					return "";
 				}else
 				{
 					if(shift){
@@ -95,15 +104,17 @@ String Peep::handleTouch(int x,int y){
 	}else{
 		if(elementCount>-1){
 			for(int i=0;i<elementCount;i++){
-				int retVal=controlElements[i]->handleTouch(x,y);
+				if(controlElements[i]->getZIndex()>=this->getZIndex()){	
+					int retVal=controlElements[i]->handleTouch(x,y);
 				
-				if(retVal>0){
-					if(controlElements[i]->requestsInput()){
-						controlEditing=controlElements[i];
-						showKeyboard();
-						return "";
-					}else{
-						return controlElements[i]->getID();
+					if(retVal>0){
+						if(controlElements[i]->requestsInput()){
+							controlEditing=controlElements[i];
+							showKeyboard();
+							return "";
+						}else{
+							return controlElements[i]->getID();
+						}
 					}
 				}
 			}
@@ -185,7 +196,6 @@ void Peep::showKeyboard(){
 void Peep::hideKeyboard(){
 	keyboardVisible=false;
 	repaint();
-	Serial.println("Keyboard hidden");
 	if(controlEditing){
 		controlEditing->setText(keyboardText);
 	}
@@ -199,8 +209,12 @@ ControlElement::ControlElement(String id,int x,int y,int width,int height){
 	this->width=width;
 	this->height=height;
 	this->id=id;
+	this->zIndex=0;
 }
 
+int ControlElement::getZIndex(){
+	return zIndex;
+}
 
 String ControlElement::getID(){
 	return this->id;
@@ -295,9 +309,7 @@ void Checkbox::setChecked(bool checked){
 }
 
 int Checkbox::handleTouch(int x,int y){
-	Serial.println(this->getY());
-	Serial.println(this->getHeight());
-	Serial.println(y);
+
 	
 	if(x>=this->getX() && this->getX()+this->getWidth()<=x && y>=this->getY() && y<=this->getY()+this->getHeight()){
 		setChecked(!isChecked());
@@ -362,6 +374,7 @@ MessageBox::MessageBox(String caption,String text,int style,int buttons):Control
 	this->text=text;
 	this->style=style;
 	this->buttons=buttons;
+	zIndex=1;
 }
 
 
@@ -443,9 +456,11 @@ void MessageBox::setVisible(bool visible){
 	if(this->visible!=visible){
 		this->visible=visible;
 		if(visible){
+			paintable->setZIndex(1);
 			paintElement();
 		}else{
 			paintable->repaint();
+			paintable->setZIndex(0);
 		}
 		
 			
@@ -506,6 +521,5 @@ String Input::getText(){
 
 void Input::setText(String text){
 	this->text=text;
-	Serial.println("Settext "+text);
 	paintElement();
 }

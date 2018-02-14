@@ -55,7 +55,10 @@ class Paintable{
 public:
 virtual void repaint();
 virtual MCUFRIEND_kbv* getDisplay();
-
+void setZIndex(int zIndex);
+int getZIndex();
+private:
+int zIndex;
 };
 
 
@@ -74,7 +77,9 @@ class ControlElement{
     int getHeight();
 	String getID();
 	Paintable *paintable;
+	int getZIndex();
 	protected:
+	int zIndex;
 	int x;
 	int y;
 	int width;
