@@ -2,7 +2,12 @@
 #define PeepLib
 
 #include "Arduino.h"
-#include "MCUFRIEND_kbv.h"
+#if ARDUINO < 101
+#define USE_GFX_KBV
+#include "ADA_GFX_kbv.h"
+#else
+#include "Adafruit_GFX.h"
+#endif
 
 #define     RGB(r, g, b)                (((r & 0xF8) << 8) | ((g & 0xFC) << 3) | ((b & 0xF8) >> 3))
 #define	BLACK   0x0000
@@ -54,7 +59,7 @@
 class Paintable{
 public:
 virtual void repaint();
-virtual MCUFRIEND_kbv* getDisplay();
+virtual Adafruit_GFX* getDisplay();
 void setZIndex(int zIndex);
 int getZIndex();
 private:
@@ -92,14 +97,12 @@ class ControlElement{
 
 class Peep:public Paintable{
 	public:
-	Peep(MCUFRIEND_kbv *tft);
+	Peep(Adafruit_GFX *tft);
 	void addElement(ControlElement *controlElement);
-	//void setGUI(MCUFRIEND_kbv *tft);
 	String handleTouch(int x,int y);
-	//MCUFRIEND_kbv* getTFT();
-	MCUFRIEND_kbv* tft;
+	Adafruit_GFX* tft;
 	void repaint();
-	MCUFRIEND_kbv* getDisplay();
+	Adafruit_GFX* getDisplay();
 	void showKeyboard();
 	void hideKeyboard();
 	private:
@@ -111,7 +114,7 @@ class Peep:public Paintable{
 	ControlElement* controlElements[20]={nullptr};
 	int elementCount;
 	bool keyboardVisible;
-	//MCUFRIEND_kbv* tft;
+
 
 };
 
@@ -120,8 +123,6 @@ class Button:public ControlElement{
     Button(String id,int x,int y,int width,int height,String text);
 	void paintElement() override;
 	virtual int handleTouch(int x,int y) override;
-  //protected:
-	//MCUFRIEND_kbv *tft;
   private:
 	String text;
 };
@@ -133,10 +134,7 @@ class Checkbox:public ControlElement{
 	virtual int handleTouch(int x,int y) override;
 	bool isChecked();
 	void setChecked(bool checked);
-  //protected:
-	//MCUFRIEND_kbv *tft;
   private:
-
 	String text;
 	bool checked;
 };
@@ -148,8 +146,6 @@ class Label:public ControlElement{
 	virtual int handleTouch(int x,int y) override;
 	void setText(String text);
 	String getText();
-  //protected:
-	//MCUFRIEND_kbv *tft;
   private:
 
 	String text;

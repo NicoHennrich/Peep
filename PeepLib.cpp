@@ -1,7 +1,6 @@
 #include "Arduino.h"
 #include "PeepLib.h"
 
-//static MCUFRIEND_kbv *tft;
 const int KEYROWCOUNT=5;
 const int KEYCOLCOUNT=10;
 char KEYBOARD[KEYROWCOUNT][KEYCOLCOUNT]= {{'1','2','3','4','5','6','7','8','9','0'},{'Q','W','E','R','T','Z','U','I','O','P'},
@@ -20,7 +19,7 @@ int Paintable::getZIndex(){
 	return zIndex;
 }
 
-Peep::Peep(MCUFRIEND_kbv *tft):Paintable(){
+Peep::Peep(Adafruit_GFX *tft):Paintable(){
 	setZIndex(0);
 	this->tft=tft;
 	tft->fillScreen(BACKGROUND); 
@@ -41,7 +40,7 @@ void Peep::repaint(){
 	}
 }
 
-MCUFRIEND_kbv* Peep::getDisplay(){
+Adafruit_GFX* Peep::getDisplay(){
 	return tft;
 }
 
