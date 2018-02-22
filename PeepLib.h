@@ -1,7 +1,6 @@
 #ifndef PeepLib
 #define PeepLib
 
-#include "Arduino.h"
 #if ARDUINO < 101
 #define USE_GFX_KBV
 #include "ADA_GFX_kbv.h"
@@ -26,6 +25,12 @@
 #define MSGBOX_WARNING 1
 #define MSGBOX_INFORMATION 2
 #define MSGBOX_QUESTION 3
+
+#define RESULT_OK 0
+#define RESULT_YES 1
+#define RESULT_NO 2
+#define RESULT_CANCEL 3
+
 
 #define BTN_OK 0
 #define BTN_YESNO 1
@@ -56,6 +61,21 @@
 		
 #endif
 
+#define EVT_NONE 0
+#define EVT_CLICK 1
+#define EVT_KEYBOARDSHOW 2
+#define EVT_KEYBOARDHIDE 3
+
+struct Event{
+	String id;
+	int eventType;
+	int customType;
+	
+};
+
+
+
+
 class Paintable{
 public:
 virtual void repaint();
@@ -76,14 +96,16 @@ class ControlElement{
 	virtual bool requestsInput();
 	virtual void setText(String text);
 	virtual String getText();
+	virtual void setPaintable(Paintable *paintable);
     int getX();
     int getY();
     int getWidth();
     int getHeight();
 	String getID();
-	Paintable *paintable;
+	
 	int getZIndex();
 	protected:
+	Paintable *paintable;
 	int zIndex;
 	int x;
 	int y;
@@ -99,7 +121,7 @@ class Peep:public Paintable{
 	public:
 	Peep(Adafruit_GFX *tft);
 	void addElement(ControlElement *controlElement);
-	String handleTouch(int x,int y);
+	Event handleTouch(int x,int y);
 	Adafruit_GFX* tft;
 	void repaint();
 	Adafruit_GFX* getDisplay();
@@ -154,19 +176,19 @@ class Label:public ControlElement{
 class MessageBox:public ControlElement{
 	public:
 	MessageBox(String caption,String text);
-	MessageBox(String caption,String text,int style,int buttons);
+	MessageBox(String caption,String text,int style,int buttonStyle);
 	void paintElement() override;
 	virtual int handleTouch(int x,int y) override;
+	virtual void setPaintable(Paintable *paintable) override;
 	void setVisible(bool visible);
 	private:
+Button* buttons[3]={nullptr};
+	int buttonCount;
 	int style;
-	int buttons;
+	int buttonStyle;
 	String caption;
 	bool visible;
-	int buttonX;
-	int buttonY;
-	int buttonWidth;
-	int buttonHeight;
+
 	String text;
 	
 };

@@ -1,8 +1,22 @@
-#include "Arduino.h"
+
 #include "PeepLib.h"
 
 const int KEYROWCOUNT=5;
 const int KEYCOLCOUNT=10;
+
+void paintButton(Adafruit_GFX* tft,int x,int y,int width,int height,String text,int textSize){
+	tft->fillRect(x,y,width,height,RISEDSURFACE);
+	tft->drawLine(x,y,x+width,y,SHADELIGHT);
+	tft->drawLine(x,y,x,y+height,SHADELIGHT);
+	tft->drawLine(x,y+height,x+width,y+height,SHADEDARK);
+	tft->drawLine(x+width,y,x+width,y+height,SHADEDARK);
+	tft->setTextColor(TEXTCOLOR, GRAY),
+	tft->setTextSize(textSize);
+	tft->setCursor(x+10,y+height/2-5);
+	tft->println(text);  	
+	
+}
+
 char KEYBOARD[KEYROWCOUNT][KEYCOLCOUNT]= {{'1','2','3','4','5','6','7','8','9','0'},{'Q','W','E','R','T','Z','U','I','O','P'},
 {'A','S','D','F','G','H','J','K','L',(char)13},
 {'Y','X','C','V','B','N','M','(',')',(char)8},
@@ -49,7 +63,7 @@ void Peep::addElement(ControlElement *controlElement){
 	if(elementCount==-1){
 		elementCount=0;
 	}
-	controlElement->paintable=this;
+	controlElement->setPaintable(this);
 	
 	this->controlElements[elementCount]=controlElement;
 	
@@ -60,11 +74,14 @@ void Peep::addElement(ControlElement *controlElement){
 
 
 
-String Peep::handleTouch(int x,int y){
+Event Peep::handleTouch(int x,int y){
 	if(keyboardVisible){
 		if(x>=getDisplay()->width()-closeButtonSize && y<=closeButtonSize){
 			hideKeyboard();
-			return "";
+			Event evt;
+			evt.id="Peep";
+			evt.eventType=EVT_KEYBOARDHIDE;
+			return evt;
 		}else{
 			
 			if(y>getDisplay()->height()-KEYROWCOUNT*keyButtonHeight){
@@ -79,7 +96,10 @@ String Peep::handleTouch(int x,int y){
 				}else
 				if((int)KEYBOARD[row][col]==13){
 					hideKeyboard();
-					return "";
+					Event evt;
+					evt.id="Peep";
+					evt.eventType=EVT_KEYBOARDSHOW;
+					return evt;
 				}else
 				{
 					if(shift){
@@ -97,8 +117,10 @@ String Peep::handleTouch(int x,int y){
 				getDisplay()->println(keyboardText); 
 				delay(200);				
 			}
-			
-			return "";
+			Event evt;
+			evt.id="Peep";
+			evt.eventType=EVT_KEYBOARDSHOW;
+			return evt;
 		}
 	}else{
 		if(elementCount>-1){
@@ -110,15 +132,26 @@ String Peep::handleTouch(int x,int y){
 						if(controlElements[i]->requestsInput()){
 							controlEditing=controlElements[i];
 							showKeyboard();
-							return "";
+							Event evt;
+							evt.id="Peep";
+							evt.eventType=EVT_KEYBOARDSHOW;
+							return evt;
 						}else{
-							return controlElements[i]->getID();
+							Event evt;
+							evt.id=controlElements[i]->getID();
+							evt.eventType=EVT_CLICK;
+							evt.customType=retVal;
+							return evt;
 						}
 					}
 				}
 			}
 		}
-		return "";
+		Event evt;
+		evt.id="Peep";
+		evt.eventType=EVT_NONE;
+		return evt;
+		
 	}
 	
 }
@@ -211,6 +244,11 @@ ControlElement::ControlElement(String id,int x,int y,int width,int height){
 	this->zIndex=0;
 }
 
+void ControlElement::setPaintable(Paintable *paintable){
+	this->paintable=paintable;
+}
+
+
 int ControlElement::getZIndex(){
 	return zIndex;
 }
@@ -254,16 +292,7 @@ Button::Button(String id,int x,int y,int width,int height,String text):ControlEl
 void Button::paintElement(){
 
 
-  	paintable->getDisplay()->fillRect(this->getX(),this->getY(),this->getWidth(),this->getHeight(),RISEDSURFACE);
-	paintable->getDisplay()->drawLine(this->getX(),this->getY(),this->getX()+this->getWidth(),this->getY(),SHADELIGHT);
-	paintable->getDisplay()->drawLine(this->getX(),this->getY(),this->getX(),this->getY()+this->getHeight(),SHADELIGHT);
-	paintable->getDisplay()->drawLine(this->getX(),this->getY()+this->getHeight(),this->getX()+this->getWidth(),this->getY()+this->getHeight(),SHADEDARK);
-	paintable->getDisplay()->drawLine(this->getX()+this->getWidth(),this->getY(),this->getX()+this->getWidth(),this->getY()+this->getHeight(),SHADEDARK);
-	paintable->getDisplay()->setTextColor(TEXTCOLOR, GRAY),
-	paintable->getDisplay()->setTextSize(1);
-	paintable->getDisplay()->setCursor(this->getX()+10,this->getY()+this->getHeight()/2-5);
-	paintable->getDisplay()->println(this->text);  	
-	
+	paintButton(paintable->getDisplay(),this->getX(),this->getY(),this->getWidth(),this->getHeight(),text,1);
 	
 }
 
@@ -368,12 +397,26 @@ String Label::getText(){
 	return this->text;
 }
 
-MessageBox::MessageBox(String caption,String text,int style,int buttons):ControlElement("MessageBox",10,10,0,0){
+MessageBox::MessageBox(String caption,String text,int style,int buttonStyle):ControlElement("MessageBox",10,10,0,0){
 	this->caption=caption;
 	this->text=text;
 	this->style=style;
-	this->buttons=buttons;
+	this->buttonStyle=buttonStyle;
 	zIndex=1;
+	switch(buttonStyle){
+		case BTN_OK:
+			buttonCount=1;
+			break;
+		case BTN_YESNO:
+			buttonCount=2;
+			break;
+		case BTN_OKCANCEL:
+			buttonCount=2;
+			break;
+		case BTN_YESNOCANCEL:
+			buttonCount=3;
+			break;
+	}
 }
 
 
@@ -382,73 +425,106 @@ MessageBox::MessageBox(String caption,String text):MessageBox(caption,text,MSGBO
 }
 void MessageBox::paintElement(){
 	if(this->visible){
-	width=(int)paintable->getDisplay()->width()-20;
-	height=(int)paintable->getDisplay()->height()-20;
-	paintable->getDisplay()->fillRect(this->getX(),this->getY(),this->getWidth(),this->getHeight(),GRAY);
-	paintable->getDisplay()->drawLine(this->getX(),this->getY(),this->getX()+this->getWidth(),this->getY(),WHITE);
-	paintable->getDisplay()->drawLine(this->getX(),this->getY(),this->getX(),this->getY()+this->getHeight(),WHITE);
-	paintable->getDisplay()->drawLine(this->getX(),this->getY()+this->getHeight(),this->getX()+this->getWidth(),this->getY()+this->getHeight(),DARKGRAY);
-	paintable->getDisplay()->drawLine(this->getX()+this->getWidth(),this->getY(),this->getX()+this->getWidth(),this->getY()+this->getHeight(),DARKGRAY);
-	paintable->getDisplay()->drawLine(this->getX(),this->getY()+20,this->getX()+this->getWidth(),this->getY()+20,WHITE);
-	paintable->getDisplay()->drawLine(this->getX(),this->getY()+21,this->getX()+this->getWidth(),this->getY()+21,DARKGRAY);
-	paintable->getDisplay()->setTextColor(TEXTCOLOR, GRAY),
-	paintable->getDisplay()->setTextSize(1);
-	paintable->getDisplay()->setCursor(this->getX()+5,this->getY()+5);
-	paintable->getDisplay()->println(this->caption); 	
-	
-	if(this->style==MSGBOX_NONE){
-		paintable->getDisplay()->setCursor(this->getX()+5,this->getY()+30);
-	}else{
-		paintable->getDisplay()->setCursor(this->getX()+5,this->getY()+30);
-		paintable->getDisplay()->setTextSize(3);
-		switch(this->style){
-			case MSGBOX_WARNING:
-			paintable->getDisplay()->setTextColor(RED, GRAY);
-			paintable->getDisplay()->println("!");  
-			break;
-			case MSGBOX_INFORMATION:
-			paintable->getDisplay()->setTextColor(BLUE, GRAY);
-			paintable->getDisplay()->println("i");  
-			break;
-			case MSGBOX_QUESTION:
-			paintable->getDisplay()->setTextColor(YELLOW, GRAY);
-			paintable->getDisplay()->println("?");  
-			break;
+
+		paintable->getDisplay()->fillRect(this->getX(),this->getY(),this->getWidth(),this->getHeight(),GRAY);
+		paintable->getDisplay()->drawLine(this->getX(),this->getY(),this->getX()+this->getWidth(),this->getY(),WHITE);
+		paintable->getDisplay()->drawLine(this->getX(),this->getY(),this->getX(),this->getY()+this->getHeight(),WHITE);
+		paintable->getDisplay()->drawLine(this->getX(),this->getY()+this->getHeight(),this->getX()+this->getWidth(),this->getY()+this->getHeight(),DARKGRAY);
+		paintable->getDisplay()->drawLine(this->getX()+this->getWidth(),this->getY(),this->getX()+this->getWidth(),this->getY()+this->getHeight(),DARKGRAY);
+		paintable->getDisplay()->drawLine(this->getX(),this->getY()+20,this->getX()+this->getWidth(),this->getY()+20,WHITE);
+		paintable->getDisplay()->drawLine(this->getX(),this->getY()+21,this->getX()+this->getWidth(),this->getY()+21,DARKGRAY);
+		paintable->getDisplay()->setTextColor(TEXTCOLOR, GRAY),
+		paintable->getDisplay()->setTextSize(1);
+		paintable->getDisplay()->setCursor(this->getX()+5,this->getY()+5);
+		paintable->getDisplay()->println(this->caption); 	
+		
+		if(this->style==MSGBOX_NONE){
+			paintable->getDisplay()->setCursor(this->getX()+5,this->getY()+30);
+		}else{
+			paintable->getDisplay()->setCursor(this->getX()+5,this->getY()+30);
+			paintable->getDisplay()->setTextSize(3);
+			switch(this->style){
+				case MSGBOX_WARNING:
+				paintable->getDisplay()->setTextColor(RED, GRAY);
+				paintable->getDisplay()->println("!");  
+				break;
+				case MSGBOX_INFORMATION:
+				paintable->getDisplay()->setTextColor(BLUE, GRAY);
+				paintable->getDisplay()->println("i");  
+				break;
+				case MSGBOX_QUESTION:
+				paintable->getDisplay()->setTextColor(YELLOW, GRAY);
+				paintable->getDisplay()->println("?");  
+				break;
+			}
+			paintable->getDisplay()->setCursor(this->getX()+25,this->getY()+30);
+			
+		
 		}
-		paintable->getDisplay()->setCursor(this->getX()+25,this->getY()+30);
+		paintable->getDisplay()->setTextSize(1);
+		paintable->getDisplay()->setTextColor(TEXTCOLOR, GRAY);
+		paintable->getDisplay()->println(this->text); 	
 		
 	
-	}
-	paintable->getDisplay()->setTextSize(1);
-	paintable->getDisplay()->setTextColor(TEXTCOLOR, GRAY);
-	paintable->getDisplay()->println(this->text); 	
-	
-	
-	buttonWidth=50;
-	buttonHeight=50;
-	buttonY=this->getY()+this->getHeight()-buttonHeight-10;
-	buttonX=this->getX()+this->getWidth()/2-buttonWidth/2;
-	paintable->getDisplay()->fillRect(buttonX,buttonY,buttonWidth,buttonHeight,GRAY);
-	paintable->getDisplay()->drawLine(buttonX,buttonY,buttonX+buttonWidth,buttonY,WHITE);
-	paintable->getDisplay()->drawLine(buttonX,buttonY,buttonX,buttonY+buttonHeight,WHITE);
-	paintable->getDisplay()->drawLine(buttonX,buttonY+buttonHeight,buttonX+buttonWidth,buttonY+buttonHeight,DARKGRAY);
-	paintable->getDisplay()->drawLine(buttonX+buttonWidth,buttonY,buttonX+buttonWidth,buttonY+buttonHeight,DARKGRAY);
-	
-	
-
-	paintable->getDisplay()->setCursor(buttonX+15,buttonY+buttonHeight/2-5);
-	paintable->getDisplay()->setTextSize(2);
-	paintable->getDisplay()->setTextColor(TEXTCOLOR, GRAY);
-	paintable->getDisplay()->println("OK");  	
+		for(int i=0;i<buttonCount;i++){
+			buttons[i]->paintElement();
+		}
 	}
 };
 int MessageBox::handleTouch(int x,int y){
-	if(buttonX<=x && buttonX+buttonWidth>=x && buttonY<=y && buttonY<=y && buttonY+buttonHeight>=y){
-		setVisible(false);
-		return 1;
-	}else{
-		return -1;
+	for(int i=0;i<buttonCount;i++){
+		if(buttons[i]->handleTouch(x,y)>-1){
+			setVisible(false);
+
+			return buttons[i]->getID().toInt();;
+		}
 	}
+
+	return -1;
+	
+}
+
+void MessageBox::setPaintable(Paintable *paintable){
+	ControlElement::setPaintable(paintable);
+	width=(int)paintable->getDisplay()->width()-20;
+	height=(int)paintable->getDisplay()->height()-20;
+	int buttonWidth=50;
+	int buttonHeight=50;
+	int buttonY=this->getY()+this->getHeight()-buttonHeight-10;
+	if(buttonStyle==BTN_OK){
+		int buttonX=this->getX()+this->getWidth()/2-buttonWidth/2;
+
+		buttons[0]=new Button(String(RESULT_OK),buttonX,buttonY,buttonWidth,buttonHeight,"Ok");
+		buttons[0]->setPaintable(paintable);
+	}else
+		if(buttonStyle==BTN_OKCANCEL){
+			int buttonX=this->getX()+this->getWidth()/2-buttonWidth-10;
+	
+			buttons[0]=new Button(String(RESULT_OK),buttonX,buttonY,buttonWidth,buttonHeight,"Ok");
+			buttons[0]->setPaintable(paintable);
+			buttons[1]=new Button(String(RESULT_CANCEL),buttonX+buttonWidth+10,buttonY,buttonWidth,buttonHeight,"Cancel");
+			buttons[1]->setPaintable(paintable);
+		}else
+		if(buttonStyle==BTN_YESNO){
+			int buttonX=this->getX()+this->getWidth()/2-buttonWidth-10;
+	
+			buttons[0]=new Button(String(RESULT_YES),buttonX,buttonY,buttonWidth,buttonHeight,"Yes");
+			buttons[0]->setPaintable(paintable);
+			buttons[1]=new Button(String(RESULT_NO),buttonX+buttonWidth+10,buttonY,buttonWidth,buttonHeight,"No");
+			buttons[1]->setPaintable(paintable);
+		}else
+		if(buttonStyle==BTN_YESNOCANCEL){
+			int buttonX=this->getX()+this->getWidth()/2-buttonWidth-20-buttonWidth/2;
+	
+			buttons[0]=new Button(String(RESULT_YES),buttonX,buttonY,buttonWidth,buttonHeight,"Yes");
+			buttons[0]->setPaintable(paintable);
+			buttons[1]=new Button(String(RESULT_NO),buttonX+buttonWidth+10,buttonY,buttonWidth,buttonHeight,"No");
+			buttons[1]->setPaintable(paintable);
+			buttons[2]=new Button(String(RESULT_CANCEL),buttonX+2*(buttonWidth+10),buttonY,buttonWidth,buttonHeight,"Cancel");
+			buttons[2]->setPaintable(paintable);
+		}
+	
+	
 }
 
 void MessageBox::setVisible(bool visible){
